@@ -2,35 +2,35 @@
 [![Source](https://img.shields.io/badge/source-farbesdev/laravel--ronin-blue.svg?style=flat-square)](https://github.com/farojas85/shinobi)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square)](https://tldrlegal.com/license/mit-license)
 
-A simple, light-weight, and highly-performant role-based permissions system for Laravel's Authorization Gate. Fully optimized for high-concurrency environments using Redis and request-level memory caching.
+Un sistema de permisos basado en roles simple, ligero y altamente eficiente para el Authorization Gate nativo de Laravel. Totalmente optimizado para entornos de alta concurrencia mediante el uso de caché híbrida en memoria y Redis.
 
-- Every user can have zero or more permissions.
-- Every user can have zero or more roles.
-- Every role can have zero or more permissions.
-- Every role can have one of two special flags: `all-access` (bypasses all checks) and `no-access` (denies all permissions).
-- **High-Performance Caching**: Powered by request-level in-memory caching and granular Redis keys.
+- Cada usuario puede tener cero o más permisos.
+- Cada usuario puede tener cero o más roles.
+- Cada rol puede tener cero o más permisos.
+- Cada rol puede tener uno de dos flags especiales: `all-access` (otorga todos los accesos) y `no-access` (deniega todos los permisos).
+- **Caché de Alto Rendimiento**: Potenciado por almacenamiento en caché estática en memoria a nivel de petición y llaves granulares en Redis.
 
 ---
 
-## Installation
+## Instalación
 
-Install the package via Composer:
+Instala el paquete a través de Composer:
 
 ```bash
 composer require farbesdev/laravel-ronin
 ```
 
-### 1. Publish Configuration
-To publish the configuration file, execute:
+### 1. Publicar Configuración
+Para publicar el archivo de configuración, ejecuta:
 
 ```bash
 php artisan vendor:publish --provider="Laravel\Ronin\ShinobiServiceProvider" --tag="config"
 ```
 
-This will create a `config/ronin.php` file in your application.
+Esto creará un archivo `config/ronin.php` en tu aplicación.
 
-### 2. Run Migrations
-Run the migrations to create the roles, permissions, and pivot tables:
+### 2. Ejecutar Migraciones
+Ejecuta las migraciones para crear las tablas de roles, permisos y tablas pivote correspondientes:
 
 ```bash
 php artisan migrate
@@ -38,48 +38,48 @@ php artisan migrate
 
 ---
 
-## Configuration
+## Configuración
 
-In `config/ronin.php`, you can customize your caching strategy to suit your scalability requirements:
+En `config/ronin.php`, puedes personalizar tu estrategia de caché para adaptarla a tus requisitos de escalabilidad:
 
 ```php
 'cache' => [
-    // Enable or disable cross-request caching (e.g. using Redis)
+    // Habilitar o deshabilitar la caché entre peticiones (ej. usando Redis)
     'enabled' => env('RONIN_CACHE_ENABLED', false),
 
-    // Enable in-memory PHP array cache for the duration of the current HTTP request
+    // Habilitar la caché en memoria local para la petición HTTP actual
     'request_memory' => true,
 
-    // Enable granular caching per user/role specifically instead of the entire table
+    // Habilitar caché granular por usuario/rol en lugar de toda la tabla de permisos
     'granular' => true,
 
-    // Cache TTL in seconds (default is 24 hours)
+    // TTL de caché en segundos (por defecto es 24 horas)
     'length' => 86400,
 
-    // Prefix used for Redis cache keys
+    // Prefijo usado para las llaves de caché en Redis
     'prefix' => 'ronin',
 ],
 ```
 
 ---
 
-## Caching Architecture
+## Arquitectura de Caché
 
-Laravel Ronin features a hybrid, supercharged caching mechanism:
+Laravel Ronin incluye un mecanismo híbrido de caché:
 
-1. **Request-Level Cache**: Stores role/permission checks in a static memory registry for the duration of a single HTTP request lifecycle. Even if caching is disabled, this ensures that multiple checks on the same user instance execute exactly **zero additional queries**.
-2. **Granular Redis Cache**: Instead of caching the entire permissions database (which degrades under large datasets), Ronin segments the cache keys:
-   - `ronin:user:{id}:roles` -> Stores user roles.
-   - `ronin:user:{id}:permissions` -> Stores user direct permissions.
-   - `ronin:role:{id}:permissions` -> Stores role permissions.
-3. **Smart Invalidation**: When relationships are modified via `assignRoles`, `removeRoles`, `givePermissionTo`, `syncPermissions`, etc., only the keys affected are flushed.
+1. **Caché a nivel de Petición (Request)**: Almacena los resultados de verificación de roles/permisos en memoria estática para la petición HTTP actual. Incluso si la caché persistente está desactivada, esto garantiza que múltiples verificaciones del mismo usuario ejecuten exactamente **cero consultas a la base de datos**.
+2. **Caché Granular en Redis**: En lugar de guardar toda la base de datos de permisos (lo cual degrada el rendimiento al crecer el volumen de datos), Ronin segmenta las llaves:
+   - `ronin:user:{id}:roles` -> Guarda los roles del usuario.
+   - `ronin:user:{id}:permissions` -> Guarda los permisos directos del usuario.
+   - `ronin:role:{id}:permissions` -> Guarda los permisos de un rol.
+3. **Invalidación Inteligente**: Al modificar relaciones mediante `assignRoles`, `removeRoles`, `givePermissionTo`, `syncPermissions`, etc., únicamente se invalidan las llaves específicas afectadas.
 
 ---
 
-## Usage
+## Uso
 
-### Traits Setup
-Add the `HasRolesAndPermissions` trait to your `User` model:
+### Configuración del Modelo
+Añade el trait `HasRolesAndPermissions` a tu modelo `User`:
 
 ```php
 use Laravel\Ronin\Concerns\HasRolesAndPermissions;
@@ -91,31 +91,31 @@ class User extends Authenticatable
 }
 ```
 
-### Assigning Roles & Permissions
+### Asignación de Roles y Permisos
 
 ```php
-// Assigning roles
+// Asignación de roles
 $user->assignRoles('admin');
 $user->removeRoles('admin');
 $user->syncRoles(['editor', 'moderator']);
 
-// Granting permissions
+// Otorgar permisos
 $user->givePermissionTo('edit.posts');
 $user->revokePermissionTo('edit.posts');
 $user->syncPermissions(['edit.posts', 'delete.posts']);
 ```
 
-### Checking Permissions
+### Validación de Permisos
 
-Use Laravel's native `Gate` or the model helpers:
+Utiliza la Gate nativa de Laravel o los métodos del modelo:
 
 ```php
-// Native gate checks
+// Uso de Gates nativos
 if (Gate::allows('edit.posts')) {
     // ...
 }
 
-// User model checks
+// Métodos del modelo User
 if ($user->hasPermissionTo('edit.posts')) {
     // ...
 }
@@ -125,50 +125,50 @@ if ($user->hasRole('admin')) {
 }
 ```
 
-### Blade Directives
+### Directivas Blade
 
 ```html
 @can('edit.posts')
-    <!-- User has permission -->
+    <!-- El usuario tiene el permiso -->
 @endcan
 
 @role('admin')
-    <!-- User has the admin role -->
+    <!-- El usuario tiene el rol admin -->
 @endrole
 
 @anyrole('editor', 'moderator')
-    <!-- User has at least one of these roles -->
+    <!-- El usuario tiene al menos uno de estos roles -->
 @endanyrole
 
 @allroles('editor', 'moderator')
-    <!-- User has all of these roles -->
+    <!-- El usuario tiene todos estos roles -->
 @endallroles
 ```
 
-### Middleware Protection
+### Protección con Middlewares
 
-You can protect your routes using the built-in middlewares:
+Puedes proteger tus rutas con los middlewares incluidos:
 
 ```php
 Route::group(['middleware' => ['role:admin']], function () {
-    // Routes protected by role
+    // Rutas protegidas por rol
 });
 
 Route::group(['middleware' => ['permission:edit.posts']], function () {
-    // Routes protected by permission
+    // Rutas protegidas por permiso
 });
 ```
 
 ---
 
-## Testing
+## Pruebas
 
-Run the test suite with PHPUnit:
+Ejecuta la suite de pruebas con PHPUnit:
 
 ```bash
 composer test
 ```
 
-## License
+## Licencia
 
-This package is open-sourced software licensed under the [MIT License](LICENSE).
+Este paquete es software de código abierto con licencia [MIT](LICENSE.md).

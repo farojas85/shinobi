@@ -23,6 +23,8 @@ abstract class TestCase extends Orchestra
     {
         parent::setUp();
 
+        \Laravel\Ronin\CacheRegistry::clear();
+
         $this->withFactories(__DIR__.'/factories');
 
         $this->loadLaravelMigrations(['--database' => 'testing']);

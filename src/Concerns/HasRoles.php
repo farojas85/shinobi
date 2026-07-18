@@ -6,8 +6,12 @@ namespace Laravel\Ronin\Concerns;
 
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
+use Illuminate\Database\Eloquent\Model;
 use Laravel\Ronin\Contracts\Role;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Laravel\Ronin\Guard;
+
+use Laravel\Ronin\CacheRegistry;
 
 trait HasRoles
 {
@@ -18,20 +22,91 @@ trait HasRoles
      */
     public function roles(): BelongsToMany
     {
-        return $this->belongsToMany(config('shinobi.models.role'))->withTimestamps();
+        return $this->belongsToMany(config('ronin.models.role'))->withTimestamps();
+    }
+
+    /**
+     * Get the cached roles for this model.
+     *
+     * @return array
+     */
+    public function getCachedRoles(): array
+    {
+        $class = get_class($this);
+        $id = $this->getKey();
+
+        if (config('ronin.cache.request_memory', true)) {
+            $cached = CacheRegistry::get('roles', $class, $id);
+            if ($cached !== null) {
+                return $cached;
+            }
+        }
+
+        $fetchRoles = function() {
+            $table = config('ronin.tables.roles', 'roles');
+            return $this->roles()->get(["{$table}.id", "{$table}.slug", "{$table}.guard_name", "{$table}.special"])->toArray();
+        };
+
+        if (config('ronin.cache.enabled') && config('ronin.cache.granular')) {
+            $prefix = config('ronin.cache.prefix', 'ronin');
+            $cacheKey = "{$prefix}:user:{$id}:roles";
+            $roles = cache()->remember($cacheKey, config('ronin.cache.length'), $fetchRoles);
+        } else {
+            $roles = $fetchRoles();
+        }
+
+        if (config('ronin.cache.request_memory', true)) {
+            CacheRegistry::set('roles', $class, $id, $roles);
+        }
+
+        return $roles;
+    }
+
+    /**
+     * Clear the cached roles and permissions for this model.
+     *
+     * @return void
+     */
+    public function forgetCachedRolesAndPermissions(): void
+    {
+        $class = get_class($this);
+        $id = $this->getKey();
+
+        CacheRegistry::clear();
+
+        if (config('ronin.cache.enabled')) {
+            $prefix = config('ronin.cache.prefix', 'ronin');
+            cache()->forget("{$prefix}:user:{$id}:roles");
+            cache()->forget("{$prefix}:user:{$id}:permissions");
+        }
     }
 
     /**
      * Checks if the model has the given role assigned.
      * 
      * @param  string  $role
+     * @param  string|null  $guardName
      * @return boolean
      */
-    public function hasRole($role): bool
+    public function hasRole($role, ?string $guardName = null): bool
     {
         $slug = Str::slug($role);
+        $guards = $guardName ? collect([$guardName]) : Guard::getNames($this);
 
-        return (bool) $this->roles->where('slug', $slug)->count();
+        if (config('ronin.cache.enabled') && config('ronin.cache.granular')) {
+            $roles = $this->getCachedRoles();
+            foreach ($roles as $r) {
+                if ($r['slug'] === $slug && $guards->contains($r['guard_name'])) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        return (bool) $this->roles
+            ->where('slug', $slug)
+            ->whereIn('guard_name', $guards)
+            ->count();
     }
 
     /**
@@ -70,6 +145,10 @@ trait HasRoles
 
     public function hasRoles(): bool
     {
+        if (config('ronin.cache.enabled') && config('ronin.cache.granular')) {
+            return count($this->getCachedRoles()) > 0;
+        }
+
         return (bool) $this->roles->count();
     }
 
@@ -89,6 +168,7 @@ trait HasRoles
         }
 
         $this->roles()->syncWithoutDetaching($roles);
+        $this->forgetCachedRolesAndPermissions();
 
         return $this;
     }
@@ -105,6 +185,7 @@ trait HasRoles
         $roles = $this->getRoles($roles);
 
         $this->roles()->detach($roles);
+        $this->forgetCachedRolesAndPermissions();
 
         return $this;
     }
@@ -121,6 +202,7 @@ trait HasRoles
         $roles = $this->getRoles($roles);
 
         $this->roles()->sync($roles);
+        $this->forgetCachedRolesAndPermissions();
 
         return $this;
     }
@@ -129,25 +211,72 @@ trait HasRoles
      * Get the specified roles.
      * 
      * @param  array  $roles
-     * @return Role
+     * @return array
      */
     protected function getRoles(array $roles)
     {
-        return array_map(function($role) {
-            $model = $this->getRoleModel();
+        if (empty($roles)) {
+            return [];
+        }
 
-            if ($role instanceof $model) {
-                return $role->id;
+        $model = $this->getRoleModel();
+        
+        $models = [];
+        $ids = [];
+        $slugs = [];
+
+        foreach ($roles as $item) {
+            if ($item instanceof Model) {
+                $models[] = $item;
+            } elseif (is_numeric($item)) {
+                $ids[] = (int) $item;
+            } elseif (is_string($item)) {
+                $slugs[] = Str::slug($item);
             }
+        }
 
-            $role = $model->where('slug', $role)->first();
+        $resolved = [];
 
-            return $role->id;
-        }, $roles);
+        foreach ($models as $item) {
+            $resolved[] = (int) $item->getKey();
+        }
+
+        if (!empty($ids) || !empty($slugs)) {
+            $guards = Guard::getNames($this);
+
+            $items = $model->newQuery()
+                ->where(function ($query) use ($ids, $slugs, $guards) {
+                    if (!empty($ids)) {
+                        $query->whereIn('id', $ids);
+                    }
+                    if (!empty($slugs)) {
+                        $query->orWhere(function ($q) use ($slugs, $guards) {
+                            $q->whereIn('slug', $slugs)
+                              ->whereIn('guard_name', $guards);
+                        });
+                    }
+                })->get();
+
+            foreach ($items as $item) {
+                $resolved[] = (int) $item->id;
+            }
+        }
+
+        return array_unique($resolved);
     }
 
     public function hasPermissionRoleFlags()
     {
+        if (config('ronin.cache.enabled') && config('ronin.cache.granular')) {
+            $roles = $this->getCachedRoles();
+            foreach ($roles as $role) {
+                if ($role['special'] !== null) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         if ($this->hasRoles()) {
             return ($this->roles
                 ->filter(function($role) {
@@ -165,6 +294,6 @@ trait HasRoles
      */
     protected function getRoleModel(): Role
     {
-        return app()->make(config('shinobi.models.role'));
+        return app()->make(config('ronin.models.role'));
     }
 }

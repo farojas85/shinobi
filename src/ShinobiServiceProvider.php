@@ -27,6 +27,7 @@ class ShinobiServiceProvider extends ServiceProvider
         $this->loadMigrations();
         $this->registerGates();
         $this->registerBladeDirectives();
+        $this->registerMiddlewares();
     }
 
     /**
@@ -37,7 +38,12 @@ class ShinobiServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(
-            __DIR__.'/../config/shinobi.php', 'shinobi'
+            __DIR__.'/../config/ronin.php', 'ronin'
+        );
+
+        // Keep fallback support for 'shinobi' config key
+        $this->mergeConfigFrom(
+            __DIR__.'/../config/ronin.php', 'shinobi'
         );
 
         $this->app->singleton('shinobi', function () {
@@ -105,7 +111,7 @@ class ShinobiServiceProvider extends ServiceProvider
     protected function publishConfig(): void
     {
         $this->publishes([
-            __DIR__.'/../config/shinobi.php' => config_path('shinobi.php'),
+            __DIR__.'/../config/ronin.php' => config_path('ronin.php'),
         ], 'config');
     }
 
@@ -128,8 +134,26 @@ class ShinobiServiceProvider extends ServiceProvider
      */
     protected function loadMigrations(): void
     {
-        if (config('shinobi.migrate', true)) {
+        if (config('ronin.migrate', true)) {
             $this->loadMigrationsFrom(__DIR__.'/../migrations');
+        }
+    }
+
+    /**
+     * Register route middlewares.
+     */
+    protected function registerMiddlewares(): void
+    {
+        $router = $this->app['router'];
+
+        if ($router) {
+            $router->aliasMiddleware('role', \Laravel\Ronin\Middleware\UserHasRole::class);
+            $router->aliasMiddleware('roles.all', \Laravel\Ronin\Middleware\UserHasAllRoles::class);
+            $router->aliasMiddleware('roles.any', \Laravel\Ronin\Middleware\UserHasAnyRole::class);
+            $router->aliasMiddleware('permission', \Laravel\Ronin\Middleware\UserHasPermission::class);
+            $router->aliasMiddleware('permissions.all', \Laravel\Ronin\Middleware\UserHasAllPermissions::class);
+            $router->aliasMiddleware('permissions.any', \Laravel\Ronin\Middleware\UserHasAnyPermission::class);
+            $router->aliasMiddleware('role_or_permission', \Laravel\Ronin\Middleware\RoleOrPermission::class);
         }
     }
 }

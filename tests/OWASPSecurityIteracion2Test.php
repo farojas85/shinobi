@@ -294,7 +294,7 @@ class OWASPSecurityIteracion2Test extends TestCase
     public function a05_given_default_config_when_cache_checked_then_disabled_by_default(): void
     {
         // El caché deshabilitado por defecto es la opción segura (fail-safe default)
-        $cacheEnabled = config('shinobi.cache.enabled');
+        $cacheEnabled = config('ronin.cache.enabled');
 
         $this->assertFalse(
             $cacheEnabled,
@@ -313,8 +313,8 @@ class OWASPSecurityIteracion2Test extends TestCase
     #[Group('A05')]
     public function a05_given_default_config_when_models_checked_then_valid_classes_are_referenced(): void
     {
-        $roleModel       = config('shinobi.models.role');
-        $permissionModel = config('shinobi.models.permission');
+        $roleModel       = config('ronin.models.role');
+        $permissionModel = config('ronin.models.permission');
 
         $this->assertTrue(
             class_exists($roleModel),
@@ -338,7 +338,7 @@ class OWASPSecurityIteracion2Test extends TestCase
     #[Group('A05')]
     public function a05_given_default_config_when_cache_tag_checked_then_not_empty(): void
     {
-        $cacheTag = config('shinobi.cache.tag');
+        $cacheTag = config('ronin.cache.tag');
 
         $this->assertNotEmpty(
             $cacheTag,
@@ -357,7 +357,7 @@ class OWASPSecurityIteracion2Test extends TestCase
     #[Group('A05')]
     public function a05_given_default_config_when_cache_ttl_checked_then_positive_value(): void
     {
-        $cacheTtl = config('shinobi.cache.length');
+        $cacheTtl = config('ronin.cache.length');
 
         $this->assertIsInt($cacheTtl, '[A05] El TTL del caché debe ser un entero');
         $this->assertGreaterThan(0, $cacheTtl, '[A05] El TTL del caché debe ser positivo');

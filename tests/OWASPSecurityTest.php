@@ -340,8 +340,6 @@ class OWASPSecurityTest extends TestCase
 
     /**
      * 🟦 BDD [A06-01]:
-     * GIVEN el archivo composer.lock del paquete
-     * WHEN se auditan las dependencias con composer audit
      * THEN no debe haber CVEs conocidos críticos o altos
      */
     #[Test]
@@ -349,7 +347,23 @@ class OWASPSecurityTest extends TestCase
     #[Group('A06')]
     public function a06_given_composer_lock_when_audited_then_no_known_cves(): void
     {
-        $output = shell_exec('composer audit --format=json --working-dir=' . base_path() . ' 2>&1');
+        $packageRoot = realpath(__DIR__ . '/../');
+
+        $paths = [
+            'composer',
+            '/usr/local/bin/composer',
+            '/usr/bin/composer',
+            'php /usr/local/bin/composer',
+            'php /usr/bin/composer',
+        ];
+
+        $output = null;
+        foreach ($paths as $path) {
+            $output = shell_exec("{$path} audit --format=json --working-dir=" . escapeshellarg($packageRoot) . " 2>/dev/null");
+            if ($output) {
+                break;
+            }
+        }
 
         $this->assertNotNull($output, 'composer audit no pudo ejecutarse');
 

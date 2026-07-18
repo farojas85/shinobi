@@ -18,7 +18,7 @@ class Shinobi
     public function role(): Role
     {
         /** @var Role $model */
-        $model = app()->make(config('shinobi.models.role'));
+        $model = app()->make(config('ronin.models.role'));
 
         return $model;
     }
@@ -29,7 +29,7 @@ class Shinobi
     public function permission(): Permission
     {
         /** @var Permission $model */
-        $model = app()->make(config('shinobi.models.permission'));
+        $model = app()->make(config('ronin.models.permission'));
 
         return $model;
     }

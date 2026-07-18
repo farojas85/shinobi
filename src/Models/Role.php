@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Laravel\Ronin\Concerns\HasPermissions;
 use Laravel\Ronin\Contracts\Role as RoleContract;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Laravel\Ronin\Guard;
 
 /**
  * @property int $id
@@ -15,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property string $slug
  * @property string|null $special
  * @property string|null $description
+ * @property string $guard_name
  * @property \Illuminate\Support\Carbon $created_at
  * @property \Illuminate\Support\Carbon $updated_at
  *
@@ -29,7 +31,7 @@ class Role extends Model implements RoleContract
      *
      * @var array<int, string>
      */
-    protected $fillable = ['name', 'slug', 'description', 'special'];
+    protected $fillable = ['name', 'slug', 'description', 'special', 'guard_name'];
 
     /**
      * Create a new Role instance.
@@ -38,9 +40,11 @@ class Role extends Model implements RoleContract
      */
     public function __construct(array $attributes = [])
     {
+        $attributes['guard_name'] = $attributes['guard_name'] ?? Guard::getDefaultName(static::class);
+
         parent::__construct($attributes);
 
-        $this->setTable(config('shinobi.tables.roles'));
+        $this->setTable(config('ronin.tables.roles'));
     }
 
     /**

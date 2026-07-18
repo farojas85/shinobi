@@ -293,4 +293,48 @@ class UserTest extends TestCase
 
         $this->assertTrue($user->fresh()->hasAllRoles('moderator', 'editor'));
     }
+
+    #[Test]
+    public function it_handles_multiple_guards_correctly()
+    {
+        $user = factory(User::class)->create();
+        
+        $webPermission = factory(Permission::class)->create([
+            'slug' => 'edit-posts',
+            'guard_name' => 'web',
+        ]);
+        $apiPermission = factory(Permission::class)->create([
+            'slug' => 'edit-posts',
+            'guard_name' => 'api',
+        ]);
+
+        $user->givePermissionTo($webPermission);
+
+        // Standard lookup without guard should resolve using the default guard ('web' in this case)
+        $this->assertTrue($user->fresh()->hasPermissionTo('edit-posts'));
+
+        // Querying for 'api' guard should return false since only 'web' was granted
+        $this->assertFalse($user->fresh()->hasPermissionTo($apiPermission->slug, 'api'));
+
+        // Giving the api permission
+        $user->givePermissionTo($apiPermission);
+        $this->assertTrue($user->fresh()->hasPermissionTo('edit-posts', 'api'));
+    }
+
+    #[Test]
+    public function it_can_check_any_and_all_permissions()
+    {
+        $user = factory(User::class)->create();
+        $p1 = factory(Permission::class)->create(['slug' => 'p1']);
+        $p2 = factory(Permission::class)->create(['slug' => 'p2']);
+
+        $this->assertFalse($user->fresh()->hasAnyPermission('p1', 'p2'));
+        
+        $user->givePermissionTo($p1);
+        $this->assertTrue($user->fresh()->hasAnyPermission('p1', 'p2'));
+        $this->assertFalse($user->fresh()->hasAllPermissions('p1', 'p2'));
+
+        $user->givePermissionTo($p2);
+        $this->assertTrue($user->fresh()->hasAllPermissions('p1', 'p2'));
+    }
 }
